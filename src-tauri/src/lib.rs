@@ -61,12 +61,11 @@ impl CATapDescription {
         }
     }
 
-    pub fn get_uuid(&self) -> Uuid {
+    pub fn get_uuid(&self) -> Id<NSString> {
         unsafe {
             let nsuuid: *mut Object = msg_send![self.obj, UUID];
             let uuid_string: Id<NSString> = msg_send![nsuuid, UUIDString];
-            let rust_string: String = uuid_string.as_str().to_owned();
-            Uuid::parse_str(&rust_string).expect("Failed to parse UUID")
+            uuid_string
         }
     }
 }
@@ -102,6 +101,14 @@ extern "C" {
 fn cfstring_from_bytes_with_nul(bytes: &'static [u8]) -> CFString {
     let cstr = unsafe { CStr::from_bytes_with_nul_unchecked(bytes) };
     CFString::new(cstr.to_str().unwrap())
+}
+
+pub fn uuid_nsstring_to_cfstring(uuid_nsstring: Id<NSString>) -> CFString {
+    unsafe {
+        let raw_ptr: *const NSString = &*uuid_nsstring;
+        let cfstring: CFString = TCFType::wrap_under_get_rule(raw_ptr as *const _);
+        cfstring
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -179,7 +186,7 @@ pub fn run() {
     println!("Got device uid {}", output_uid_str);
 
     let aggregate_device_name = CFString::new("Tap-1234");
-    let aggregate_device_uid = CFString::new("tap-1234567-uid");
+    let aggregate_device_uid = CFString::new("tap-12-uid");
     let output_uid_cfstr = CFString::new(&output_uid_str);
 
     // Sub-device UID key and dictionary
@@ -188,7 +195,7 @@ pub fn run() {
         output_uid_cfstr.as_CFType(),
     )]);
 
-    let tap_uuid_string = CFString::new(&tap_description.get_uuid().to_string());
+    let tap_uuid_string = uuid_nsstring_to_cfstring(tap_description.get_uuid());
 
     println!("tap_uuid_string {}", tap_uuid_string.to_string());
 
